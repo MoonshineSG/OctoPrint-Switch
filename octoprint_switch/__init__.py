@@ -75,10 +75,7 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 					os.remove(self.MUTE_FILE)
 			
 		elif command == "power":
-			if bool( data.get('status') ):
-				self.power_printer(True)
-			else:
-				self.power_printer(False)
+			self.power_printer(bool( data.get('status') ))
 
 		elif command == "lights":
 			if bool( data.get('status') ):

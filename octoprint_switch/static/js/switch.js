@@ -47,8 +47,7 @@ $(function() {
 		
 		self.toggleMute = function() {
 			self.isMute( '#08c' );
-			self.mute = ! self.mute;
-			self.sendCommand({"command":"mute", "status":self.mute});
+			self.sendCommand({"command":"mute", "status":!self.mute});
 		}
 
 		self.togglePower = function() {
