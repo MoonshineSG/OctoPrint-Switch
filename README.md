@@ -1,4 +1,6 @@
-Add button for easy switching functions POWER, LED lights, Sound
-put `power.py` in the `/home/pi/` and `chmod +x`
+Add switch buttons for truning on/off printer, IR LED ligts and mute printer
 
-update the API_KEY in `power.py`
+Needs RPi.GPIO version greater than 0.6.0 to allow access to GPIO for non root.
+
+You need to `chmod a+rw /dev/gpiomem`
+

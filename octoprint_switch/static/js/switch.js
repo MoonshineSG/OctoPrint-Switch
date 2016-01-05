@@ -14,7 +14,11 @@ $(function() {
 			self.mute = false;
 		}
 
-		self.updateIcons = function () {
+		self.updateIcons = function (data) {
+			self.lights = JSON.parse(data.lights);
+			self.power = JSON.parse(data.power);
+			self.mute = JSON.parse(data.mute);
+			
 			self.isPower( self.power ? '#24AC00' : '#BF210E' );
 			self.isLights( self.lights ? '#24AC00' : '#BF210E' );
 			self.isMute( self.mute ? '#BF210E' : '#24AC00' );
@@ -34,27 +38,17 @@ $(function() {
 			self.get_status();
 		}
 		
-		self.onDataUpdaterPluginMessage = function (plugin, data) {
-			if (plugin != "switch") {
-				return;
-			}
-			self.lights = data.lights;
-			self.power = data.power;
-			self.mute = data.mute;
-			//console.log(data);
-			self.updateIcons();
-		} 
-		
-		self._sendData = function(data, callback) {
+		self.sendCommand = function(data) {
 			OctoPrint.postJson("api/plugin/switch", data)
 				.done(function() {
-					if (callback) callback();
+					self.get_status();
 				});
 		};
 		
 		self.toggleMute = function() {
+			self.isMute( '#08c' );
 			self.mute = ! self.mute;
-			self._sendData({"command":"mute", "status":self.mute}, function(){self.updateIcons();});
+			self.sendCommand({"command":"mute", "status":self.mute});
 		}
 
 		self.togglePower = function() {
@@ -63,23 +57,38 @@ $(function() {
 				showConfirmationDialog({
 							 message: "You are about to stop the printer. This will stop your current job.",
 							 onproceed: function() {
-									 self._sendData({"command":"power", "status":false});
+									self.isPower( '#08c' );
+									self.sendCommand({"command":"power", "status":false});
 							 }});
 				 } else {
-				 	self._sendData({"command":"power", "status":false});
+		 			self.isPower( '#08c' );
+				 	self.sendCommand({"command":"power", "status":false});
 				 }
-			} else self._sendData({"command":"power", "status":true});
+			} else {
+				self.isPower( '#08c' );
+				self.sendCommand({"command":"power", "status":true});
+			}
 			
 		}
 		
 		self.toggleLights = function() {
-			self._sendData({"command":"lights", "status":!self.lights}, function(){self.updateIcons();});
+			self.isLights( '#08c' );
+			self.sendCommand({"command":"lights", "status":!self.lights});
 		}
 
 		self.get_status = function() {
-			self._sendData({"command":"status"});
+			OctoPrint.postJson("api/plugin/switch", {"command":"status"})
+				.done(function(data) {
+					self.updateIcons(data);
+				});
 		}
-
+		
+		self.onDataUpdaterPluginMessage = function (plugin, data) {
+					if (plugin != "switch") {
+						return;
+					}
+					self.updateIcons(data);
+				} 
 	}
 
 	OCTOPRINT_VIEWMODELS.push([
