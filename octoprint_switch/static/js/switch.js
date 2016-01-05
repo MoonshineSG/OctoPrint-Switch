@@ -25,9 +25,9 @@ $(function() {
 		}
 		
 		self.onServerDisconnect = function(){
-			self.isPower( '#08c' );
-			self.isLights( '#08c' );
-			self.isMute( '#08c' );
+			self.isPower( '#aaa' );
+			self.isLights( '#aaa' );
+			self.isMute( '#aaa' );
 		}
 		
 		self.onStartupComplete = function() {
@@ -46,7 +46,7 @@ $(function() {
 		};
 		
 		self.toggleMute = function() {
-			self.isMute( '#08c' );
+			self.isMute( '#aaa' );
 			self.sendCommand({"command":"mute", "status":!self.mute});
 		}
 
@@ -56,30 +56,27 @@ $(function() {
 				showConfirmationDialog({
 							 message: "You are about to stop the printer. This will stop your current job.",
 							 onproceed: function() {
-									self.isPower( '#08c' );
+									self.isPower( '#aaa' );
 									self.sendCommand({"command":"power", "status":false});
 							 }});
 				 } else {
-		 			self.isPower( '#08c' );
+		 			self.isPower( '#aaa' );
 				 	self.sendCommand({"command":"power", "status":false});
 				 }
 			} else {
-				self.isPower( '#08c' );
+				self.isPower( '#aaa' );
 				self.sendCommand({"command":"power", "status":true});
 			}
 			
 		}
 		
 		self.toggleLights = function() {
-			self.isLights( '#08c' );
+			self.isLights( '#aaa' );
 			self.sendCommand({"command":"lights", "status":!self.lights});
 		}
 
 		self.get_status = function() {
-			OctoPrint.postJson("api/plugin/switch", {"command":"status"})
-				.done(function(data) {
-					self.updateIcons(data);
-				});
+			OctoPrint.postJson("api/plugin/switch", {"command":"status"});
 		}
 		
 		self.onDataUpdaterPluginMessage = function (plugin, data) {

@@ -88,7 +88,7 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 				GPIO.output(self.PIN_LED, GPIO.HIGH)
 
 		elif command == "status":
-			return jsonify(self.get_status())
+			self._plugin_manager.send_plugin_message(self._identifier, self.get_status())
 
 	def get_status(self):
 		mute_status  = str(os.path.isfile(self.MUTE_FILE)).lower()
