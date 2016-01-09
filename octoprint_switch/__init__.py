@@ -26,6 +26,7 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 	def initialize(self):
 		#self._logger.setLevel(logging.DEBUG)
 		
+		self._logger.info("Running RPi.GPIO version '{0}'...".format(GPIO.VERSION))
 		if GPIO.VERSION < "0.6":
 			raise Exception("RPi.GPIO must be greater than 0.6")
 			
@@ -35,8 +36,7 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		GPIO.setup(self.PIN_LED, GPIO.OUT)		#default ON  (normally closed)
 		GPIO.setup(self.PIN_RPICAM, GPIO.OUT)	#default OFF (normally open)
 		GPIO.setup(self.PIN_POWER, GPIO.OUT) #default OFF (normally open)
-		
-		
+
 		self._logger.info("SwitchPlugin initialized...")
 
 	def get_assets(self):

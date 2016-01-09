@@ -28,9 +28,10 @@ $(function() {
 			self.isPower( '#aaa' );
 			self.isLights( '#aaa' );
 			self.isMute( '#aaa' );
+			return true;
 		}
 		
-		self.onStartupComplete = function() {
+		self.onUserLoggedIn = function(user) {
 			self.get_status();
 		}
 		
