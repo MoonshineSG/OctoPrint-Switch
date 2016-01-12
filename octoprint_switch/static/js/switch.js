@@ -5,29 +5,40 @@ $(function() {
 		self.isPower = ko.observable();
 		self.isLights = ko.observable();
 		self.isMute = ko.observable();
-
+		self.willUnload = ko.observable();
+		self.willPowerOff = ko.observable();
+		
 		self.onBeforeBinding = function () {
 			self.isAdmin = viewModels[0].isAdmin;
 			self.printer = viewModels[1];
 			self.power = false;
 			self.lights = false;
 			self.mute = false;
+			self.unload = false;
+			self.poweroff = false;
 		}
 
 		self.updateIcons = function (data) {
 			self.lights = JSON.parse(data.lights);
 			self.power = JSON.parse(data.power);
 			self.mute = JSON.parse(data.mute);
+			self.unload = JSON.parse(data.unload);
+			self.poweroff = JSON.parse(data.poweroff);
 			
 			self.isPower( self.power ? '#24AC00' : '#BF210E' );
 			self.isLights( self.lights ? '#24AC00' : '#BF210E' );
 			self.isMute( self.mute ? '#BF210E' : '#24AC00' );
+			self.willUnload( self.unload ? '#24AC00' : '#BF210E' );
+			self.willPowerOff( self.poweroff ? '#24AC00' : '#BF210E' );
 		}
+		
 		
 		self.onServerDisconnect = function(){
 			self.isPower( '#aaa' );
 			self.isLights( '#aaa' );
 			self.isMute( '#aaa' );
+			self.willUnload( '#aaa' );
+			self.willPowerOff( '#aaa' );
 			return true;
 		}
 		
@@ -75,6 +86,17 @@ $(function() {
 			self.isLights( '#aaa' );
 			self.sendCommand({"command":"lights", "status":!self.lights});
 		}
+
+		self.toggleUnload = function() {
+			self.willUnload( '#aaa' );
+			self.sendCommand({"command":"unload", "status":!self.unload});
+		}
+
+		self.togglePowerOff = function() {
+			self.willPowerOff( '#aaa' );
+			self.sendCommand({"command":"poweroff", "status":!self.poweroff});
+		}
+
 
 		self.get_status = function() {
 			OctoPrint.postJson("api/plugin/switch", {"command":"status"});
