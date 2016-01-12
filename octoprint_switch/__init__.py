@@ -91,7 +91,7 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		elif command == "poweroff":
 			if bool(data.get('status')):
 				self.touch(self.POWEROFF_FILE)
-				self.touch(self.MUTE_FILE)
+				self.touch(self.UNLOAD_FILE)
 			else:
 				self.remove(self.POWEROFF_FILE)
 		elif command == "unload":
@@ -158,7 +158,7 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 					self._printer.commands(["G92 E0", "G1 E-15 F6000", "G92 E0"])
 			if os.path.isfile(self.POWEROFF_FILE):
 				if self._printer.is_operational():
-					self._printer.commands(["M104 S0", "M140 S0 C40"])
+					self._printer.commands(["M104 S0", "M140 S0 C40"]) #see cooling plugin
  
 __plugin_name__ = "Switch Plugin"
 
