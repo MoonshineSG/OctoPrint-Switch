@@ -1,3 +1,11 @@
+var inactive = "#f5f5f5"; //white
+
+var color_on = "#24AC00"; //green
+var color_off = "#B1ADAD"; //grey
+
+var action_on = "#3466FF"; //blue
+var action_off = "#B1ADAD"; //red
+
 $(function() {
 	function switchPluginViewModel(viewModels) {
 		var self = this;
@@ -25,20 +33,20 @@ $(function() {
 			self.unload = JSON.parse(data.unload);
 			self.poweroff = JSON.parse(data.poweroff);
 			
-			self.isPower( self.power ? '#24AC00' : '#BF210E' );
-			self.isLights( self.lights ? '#24AC00' : '#BF210E' );
-			self.isMute( self.mute ? '#BF210E' : '#24AC00' );
-			self.willUnload( self.unload ? '#24AC00' : '#BF210E' );
-			self.willPowerOff( self.poweroff ? '#24AC00' : '#BF210E' );
+			self.isPower( self.power ? color_on : color_off );
+			self.isLights( self.lights ? color_on : color_off );
+			self.isMute( self.mute ? color_off : color_on );
+			self.willUnload( self.unload ? action_on : action_off );
+			self.willPowerOff( self.poweroff ? action_on : action_off );
 		}
 		
 		
 		self.onServerDisconnect = function(){
-			self.isPower( '#aaa' );
-			self.isLights( '#aaa' );
-			self.isMute( '#aaa' );
-			self.willUnload( '#aaa' );
-			self.willPowerOff( '#aaa' );
+			self.isPower( inactive );
+			self.isLights( inactive );
+			self.isMute( inactive );
+			self.willUnload( inactive );
+			self.willPowerOff( inactive );
 			return true;
 		}
 		
@@ -58,7 +66,7 @@ $(function() {
 		};
 		
 		self.toggleMute = function() {
-			self.isMute( '#aaa' );
+			self.isMute( inactive );
 			self.sendCommand({"command":"mute", "status":!self.mute});
 		}
 
@@ -68,32 +76,32 @@ $(function() {
 				showConfirmationDialog({
 							 message: "You are about to stop the printer. This will stop your current job.",
 							 onproceed: function() {
-									self.isPower( '#aaa' );
+									self.isPower( inactive );
 									self.sendCommand({"command":"power", "status":false});
 							 }});
 				 } else {
-		 			self.isPower( '#aaa' );
+		 			self.isPower( inactive );
 				 	self.sendCommand({"command":"power", "status":false});
 				 }
 			} else {
-				self.isPower( '#aaa' );
+				self.isPower( inactive );
 				self.sendCommand({"command":"power", "status":true});
 			}
 			
 		}
 		
 		self.toggleLights = function() {
-			self.isLights( '#aaa' );
+			self.isLights( inactive );
 			self.sendCommand({"command":"lights", "status":!self.lights});
 		}
 
 		self.toggleUnload = function() {
-			self.willUnload( '#aaa' );
+			self.willUnload( inactive );
 			self.sendCommand({"command":"unload", "status":!self.unload});
 		}
 
 		self.togglePowerOff = function() {
-			self.willPowerOff( '#aaa' );
+			self.willPowerOff( inactive );
 			self.sendCommand({"command":"poweroff", "status":!self.poweroff});
 		}
 

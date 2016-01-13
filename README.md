@@ -1,5 +1,5 @@
-Add switch buttons for: 
-- switching printer on/off printer (confirm if currently printing)
+Add switch buttons for:
+- switching printer on/off (confirm if currently printing)
 - switch  IR LED ligths on/off
 - mute alert sounds (M300 @)
 - unload filament after printing finished
