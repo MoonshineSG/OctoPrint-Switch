@@ -13,8 +13,9 @@ import os
 from flask import jsonify
 import RPi.GPIO as GPIO 
 
+#octoprint.plugin.TemplatePlugin,
+
 class SwitchPlugin(octoprint.plugin.AssetPlugin,
-					octoprint.plugin.TemplatePlugin,
 					octoprint.plugin.SimpleApiPlugin,
 					octoprint.plugin.EventHandlerPlugin):
 	
@@ -45,6 +46,7 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		
 		self._logger.info("SwitchPlugin initialized...")
 
+
 	def get_assets(self):
 		return dict(
 			js=[
@@ -53,11 +55,6 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 			less=[],
 			css= []
 		)
-
-	def get_template_configs(self):
-		return [
-			dict(type="navbar", template="switch_menu_item.jinja2", custom_bindings=True)
-		]
 
 	def is_api_adminonly(self):
 		return True
