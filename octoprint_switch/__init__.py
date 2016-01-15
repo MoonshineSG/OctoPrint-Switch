@@ -110,8 +110,9 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 				GPIO.output(self.PIN_RPICAM, GPIO.HIGH)
 				GPIO.output(self.PIN_LED, GPIO.LOW)
 			else:
-				GPIO.output(self.PIN_RPICAM, GPIO.LOW)
-				GPIO.output(self.PIN_LED, GPIO.HIGH)
+				if not self._printer.is_printing():
+					GPIO.output(self.PIN_RPICAM, GPIO.LOW)
+					GPIO.output(self.PIN_LED, GPIO.HIGH)
 
 		elif command == "status":
 			self._plugin_manager.send_plugin_message(self._identifier, self.get_status())
@@ -134,14 +135,16 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 				self._printer._comm._log("Power up printer...")
 			GPIO.output(self.PIN_POWER, GPIO.HIGH)
 		else:
-			if self._printer._comm:
-				self._printer._comm._log("Power down printer...")
-			GPIO.output(self.PIN_POWER, GPIO.LOW)
 			try:
 				if self._printer.is_operational():
+					if self._printer._comm:
+						self._printer._comm._log("Shuting down heaters, fans and motors...")
 					self._printer.commands(["M104 S0", "M140 S0", "M106 S0", "M18"])
 			except Exception as e:
 				self._logger.error(e)
+			if self._printer._comm:
+				self._printer._comm._log("Power down printer...")
+			GPIO.output(self.PIN_POWER, GPIO.LOW)
 
 	def on_event(self, event, payload):
 		if event == Events.POWER_ON:
@@ -152,11 +155,15 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 			if self.printer_status():
 				self.power_printer(False)
 				self._plugin_manager.send_plugin_message(self._identifier, self.get_status())
+		elif event == Events.PRINT_STARTED:
+			GPIO.output(self.PIN_RPICAM, GPIO.HIGH)
+			GPIO.output(self.PIN_LED, GPIO.LOW)
+			self._plugin_manager.send_plugin_message(self._identifier, self.get_status())
 		elif event == Events.PRINT_DONE:
 			self._printer.unselect_file()
 			if os.path.isfile(self.UNLOAD_FILE):
 				if self._printer.is_operational():
-					self._printer.commands(["G92 E0", "G1 E-13 F6000", "G92 E0"])
+					self._printer.commands(["G92 E0", "G1 E-12 F500", "G92 E0"])
 			if os.path.isfile(self.POWEROFF_FILE):
 				if self._printer.is_operational():
 					self._printer.commands(["M104 S0", "M140 S0 C40"]) #see cooling plugin
