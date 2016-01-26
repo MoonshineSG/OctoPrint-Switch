@@ -45,26 +45,11 @@ $(function() {
 
 			if (element.length) {
 				element.children().first().before(`<div id="switch_menu_bar" class="accordion-group "  data-bind="visible: isAdmin" style="display: none; font-size: 22px; height: 30px; padding-top: 10px; text-align: center;">
-
-  <a href="#" title="Printer power"  style="padding-right: 14px" data-bind="click: togglePower">
-    <span data-bind="style: { color: isPower }"><i class="icon-off"></i></span>
-  </a>
-
-  <a href="#" title="IR LED lights"  style="padding-right: 14px" data-bind="click: toggleLights">
-    <span data-bind="style: { color: isLights }"><i class="icon-lightbulb"></i></span>
-  </a>
-
-  <a href="#"  title="Mute printer"  style="padding-right: 14px;" data-bind="click: toggleMute">
-    <span data-bind="style: { color: isMute }"><i class="icon-bell"></i></span>
-  </a>
-
-  <a href="#"  title="Unload Fillament when printing is done"  style="padding-right: 14px; padding-left: 15px;" data-bind="click: toggleUnload">
-    <span data-bind="style: { color: willUnload }"><i class="icon-external-link"></i></span>
-  </a>
-
-  <a href="#" title="Power off after printing finish"  style="padding-right: 14px;" data-bind="click: togglePowerOff">
-    <span data-bind="style: { color: willPowerOff  }"><i class="icon-remove-sign"></i></span>
-  </a>
+<a href="#" title="Printer power"  style="padding-right: 14px" data-bind="click: togglePower"><span data-bind="style: { color: isPower }"><i class="icon-off"></i></span></a>
+<a href="#" title="IR LED lights"  style="padding-right: 14px" data-bind="click: toggleLights"><span data-bind="style: { color: isLights }"><i class="icon-lightbulb"></i></span></a>
+<a href="#"  title="Mute printer"  style="padding-right: 14px;" data-bind="click: toggleMute"><span data-bind="style: { color: isMute }"><i class="icon-bell"></i></span></a>
+<a href="#"  title="Unload Fillament when printing is done"  style="padding-right: 14px; padding-left: 15px;" data-bind="click: toggleUnload"><span data-bind="style: { color: willUnload }"><i class="icon-external-link"></i></span></a>
+<a href="#" title="Power off after printing finish"  style="padding-right: 14px;" data-bind="click: togglePowerOff"><span data-bind="style: { color: willPowerOff  }"><i class="icon-remove-sign"></i></span></a>
 				</div>`);
 			}
 		};

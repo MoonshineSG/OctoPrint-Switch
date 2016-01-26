@@ -44,6 +44,9 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		self.touch(self.POWEROFF_FILE)
 		self.touch(self.UNLOAD_FILE)
 		
+		#the power is turned on by lights (and it should be turned off if nobody else needs it)
+		self.LIGHT = False 
+		
 		self._logger.info("SwitchPlugin initialized...")
 
 
@@ -79,7 +82,7 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 
 			
 	def on_api_command(self, command, data):
-		self._logger.info("on_api_command called: '{command}' / '{data}'".format(**locals()))
+		self._logger.debug("on_api_command called: '{command}' / '{data}'".format(**locals()))
 		if command == "mute":
 			if bool(data.get('status')):
 				self.touch(self.MUTE_FILE)
@@ -102,12 +105,16 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 
 		elif command == "lights":
 			if bool( data.get('status') ):
-				self.power_printer(True)
-
+				if not self.printer_status():
+					GPIO.output(self.PIN_POWER, GPIO.HIGH)
+					self.LIGHT = True
 				GPIO.output(self.PIN_RPICAM, GPIO.HIGH)
 				GPIO.output(self.PIN_LED, GPIO.LOW)
 			else:
 				if not self._printer.is_printing():
+					if self.LIGHT:
+						GPIO.output(self.PIN_POWER, GPIO.LOW)
+						self.LIGHT = False
 					GPIO.output(self.PIN_RPICAM, GPIO.LOW)
 					GPIO.output(self.PIN_LED, GPIO.HIGH)
 
@@ -128,23 +135,26 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		
 	def power_printer(self, status):
 		if status:
+			self.LIGHT = False
 			if self._printer._comm:
 				self._printer._comm._log("Power up printer...")
 			GPIO.output(self.PIN_POWER, GPIO.HIGH)
 		else:
-			try:
-				if self._printer.is_operational():
-					if self._printer._comm:
-						self._printer._comm._log("Shuting down heaters, fans and motors...")
-					self._printer.commands(["M104 S0", "M140 S0", "M106 S0", "M18"])
-			except Exception as e:
-				self._logger.error(e)
-			if self._printer._comm:
-				self._printer._comm._log("Power down printer...")
-			GPIO.output(self.PIN_POWER, GPIO.LOW)
+			if not self._printer.is_printing():
+				try:
+					if self._printer.is_operational():
+						if self._printer._comm:
+							self._printer._comm._log("Shuting down heaters, fans and motors...")
+						self._printer.commands(["M104 S0", "M140 S0", "M106 S0", "M18"])
+				except Exception as e:
+					self._logger.error(e)
+				if self._printer._comm:
+					self._printer._comm._log("Power down printer...")
+				GPIO.output(self.PIN_POWER, GPIO.LOW)
 
 	def on_event(self, event, payload):
-		if event == Events.POWER_ON:
+		if event == Events.POWER_ON or event == Events.HOME:
+			self.LIGHT = False
 			if not self.printer_status():
 				self.power_printer(True)
 				self._plugin_manager.send_plugin_message(self._identifier, self.get_status())
@@ -163,9 +173,9 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 					self._printer.commands(["G92 E0", "G1 E-12 F500", "G92 E0"])
 			if os.path.isfile(self.POWEROFF_FILE):
 				if self._printer.is_operational():
-					self._printer.commands(["M104 S0", "M140 S0 C40"]) #see cooling plugin
+					self._printer.commands(["M104 S0", "M140 S0 W40"]) #see cooling plugin
  
-__plugin_name__ = "Switch Plugin"
+__plugin_name__ = "Switches"
 
 def __plugin_load__():
 	global __plugin_implementation__
