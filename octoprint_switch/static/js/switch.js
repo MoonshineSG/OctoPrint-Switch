@@ -1,10 +1,12 @@
-var inactive = "#f5f5f5"; //white
+var inactive = "#fafafa";
 
-var color_on = "#24AC00"; //green
-var color_off = "#B1ADAD"; //grey
+var color_on = "#24AC00"; 
+var color_off = "#B1ADAD"; 
 
-var action_on = "#3466FF"; //blue
-var action_off = "#B1ADAD"; //red
+var action_on = "#3466FF"; 
+var action_off = "#B1ADAD"; 
+
+var action_off_red = "#ff0505";
 
 $(function() {
 	function switchPluginViewModel(viewModels) {
@@ -44,7 +46,7 @@ $(function() {
 			var element = $(".octoprint-container .accordion");
 
 			if (element.length) {
-				element.children().first().before(`<div id="switch_menu_bar" class="accordion-group "  data-bind="visible: isAdmin" style="display: none; font-size: 22px; height: 30px; padding-top: 10px; text-align: center;">
+				element.children().first().before(`<div id="switch_menu_bar" class="accordion-group "  data-bind="visible: isAdmin" style="display: none; font-size: 22px; height: 35px !important; padding-top: 10px; text-align: center;">
 <a href="#" title="Printer power"  style="padding-right: 14px" data-bind="click: togglePower"><span data-bind="style: { color: isPower }"><i class="icon-off"></i></span></a>
 <a href="#" title="IR LED lights"  style="padding-right: 14px" data-bind="click: toggleLights"><span data-bind="style: { color: isLights }"><i class="icon-lightbulb"></i></span></a>
 <a href="#"  title="Mute printer"  style="padding-right: 14px;" data-bind="click: toggleMute"><span data-bind="style: { color: isMute }"><i class="icon-bell"></i></span></a>
@@ -85,30 +87,19 @@ $(function() {
 		}
 
 		self.togglePower = function() {
-			if (self.power) {
-				if (self.printer.isPrinting() || self.printer.isPaused()) {
-				showConfirmationDialog({
-							 message: "You are about to stop the printer. This will stop your current job.",
-							 onproceed: function() {
-									self.isPower( inactive );
-									self.sendCommand({"command":"power", "status":false});
-							 }});
-				 } else {
-		 			self.isPower( inactive );
-				 	self.sendCommand({"command":"power", "status":false});
-				 }
-			} else {
-				self.isPower( inactive );
-				self.sendCommand({"command":"power", "status":true});
-			}
-			
+			if ( !(self.printer.isPrinting() || self.printer.isPaused()) ) {
+	 			self.isPower( inactive );
+				self.sendCommand({"command":"power", "status":!self.power});
+			 }
 		}
 		
 		self.toggleLights = function() {
-			self.isLights( inactive );
-			self.sendCommand({"command":"lights", "status":!self.lights});
+			if ( !(self.printer.isPrinting() || self.printer.isPaused()) ) {
+				self.isLights( inactive );
+				self.sendCommand({"command":"lights", "status":!self.lights});
+			}
 		}
-
+		
 		self.toggleUnload = function() {
 			self.willUnload( inactive );
 			self.sendCommand({"command":"unload", "status":!self.unload});
@@ -118,7 +109,6 @@ $(function() {
 			self.willPowerOff( inactive );
 			self.sendCommand({"command":"poweroff", "status":!self.poweroff});
 		}
-
 
 		self.get_status = function() {
 			OctoPrint.postJson("api/plugin/switch", {"command":"status"});

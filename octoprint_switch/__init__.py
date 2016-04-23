@@ -12,6 +12,7 @@ import logging.handlers
 import os
 from flask import jsonify
 import RPi.GPIO as GPIO 
+from time import sleep
 
 #octoprint.plugin.TemplatePlugin,
 
@@ -22,6 +23,8 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 	PIN_LED = 23	# IR LED power switch
 	PIN_RPICAM = 32	# red LED on RPi camera
 	PIN_POWER = 24	# Printer power switch
+	
+	PIN_RESET = 2 # Printer reset
 
 	def initialize(self):
 		#self._logger.setLevel(logging.DEBUG)
@@ -36,14 +39,18 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		GPIO.setup(self.PIN_LED, GPIO.OUT)		#default ON  (normally closed)
 		GPIO.setup(self.PIN_RPICAM, GPIO.OUT)	#default ON (internal)
 		GPIO.setup(self.PIN_POWER, GPIO.OUT)    #default OFF (normally open)
-					
+				
 		self.MUTE_FILE = os.path.join(self.get_plugin_data_folder(), "mute")
 		self.POWEROFF_FILE = os.path.join(self.get_plugin_data_folder(), "poweroff")
 		self.UNLOAD_FILE = os.path.join(self.get_plugin_data_folder(), "unload")
+		self.HOME_BUTTON_FILE = os.path.join(self.get_plugin_data_folder(), "home_button")
+
 		
 		self.touch(self.POWEROFF_FILE)
 		self.touch(self.UNLOAD_FILE)
 		
+		self.touch(self.HOME_BUTTON_FILE)
+
 		#the power is turned on by lights (and it should be turned off if nobody else needs it)
 		self.LIGHT = False 
 		
@@ -69,7 +76,8 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 			lights=["status"],
 			unload=["status"],
 			poweroff=["status"],
-			status=[]
+			status=[],
+			reset=[]
 		)
 
 	def touch(self, file):
@@ -79,30 +87,39 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 	def remove(self, file):
 		if os.path.isfile(file):
 			os.remove(file)
-
 			
 	def on_api_command(self, command, data):
-		self._logger.debug("on_api_command called: '{command}' / '{data}'".format(**locals()))
+		self._logger.info("on_api_command called: '{command}' / '{data}'".format(**locals()))
 		if command == "mute":
 			if bool(data.get('status')):
 				self.touch(self.MUTE_FILE)
 			else:
 				self.remove(self.MUTE_FILE)
+
+		elif command == "reset":
+			self._printer.disconnect()			
+			GPIO.setup(self.PIN_RESET, GPIO.OUT, initial=0)
+			sleep(1)
+			GPIO.cleanup(self.PIN_RESET)
+			sleep(30)
+			self._printer.connect()
+			
 		elif command == "poweroff":
 			if bool(data.get('status')):
 				self.touch(self.POWEROFF_FILE)
 				self.touch(self.UNLOAD_FILE)
 			else:
 				self.remove(self.POWEROFF_FILE)
+
 		elif command == "unload":
 			if bool(data.get('status')):
 				self.touch(self.UNLOAD_FILE)
 			else:
 				self.remove(self.UNLOAD_FILE)
-			
+
 		elif command == "power":
 			self.power_printer(bool( data.get('status') ))
-
+			
 		elif command == "lights":
 			if bool( data.get('status') ):
 				if not self.printer_status():
@@ -119,20 +136,22 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 					GPIO.output(self.PIN_LED, GPIO.HIGH)
 
 		elif command == "status":
-			self._plugin_manager.send_plugin_message(self._identifier, self.get_status())
-
-	def get_status(self):
+			self.update_status()
+		
+	def update_status(self):
 		mute_status  = str(os.path.isfile(self.MUTE_FILE)).lower()
 		unload_status  = str(os.path.isfile(self.UNLOAD_FILE)).lower()
 		poweroff_status  = str(os.path.isfile(self.POWEROFF_FILE)).lower()
 		light_status = "false" if GPIO.input(self.PIN_LED) else ("true" if GPIO.input(self.PIN_POWER) else "false")
 		power_status = str(self.printer_status()).lower()
-	
-		return dict( lights =  light_status, power = power_status,  mute = mute_status, unload = unload_status, poweroff = poweroff_status )
 		
+		payload =  dict( lights =  light_status, power = power_status,  mute = mute_status, unload = unload_status, poweroff = poweroff_status)
+		
+		self._plugin_manager.send_plugin_message(self._identifier, payload)
+
 	def printer_status(self):
 		return bool(GPIO.input(self.PIN_POWER))
-		
+
 	def power_printer(self, status):
 		if status:
 			self.LIGHT = False
@@ -153,19 +172,29 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 				GPIO.output(self.PIN_POWER, GPIO.LOW)
 
 	def on_event(self, event, payload):
-		if event == Events.POWER_ON or event == Events.HOME:
+		if event == Events.POWER_ON:
 			self.LIGHT = False
 			if not self.printer_status():
+				self.remove(self.HOME_FILE)
+				self.remove(self.SKIP_HOME_FILE)
 				self.power_printer(True)
-				self._plugin_manager.send_plugin_message(self._identifier, self.get_status())
+				self.update_status()
+
 		elif event == Events.POWER_OFF:
 			if self.printer_status():
 				self.power_printer(False)
-				self._plugin_manager.send_plugin_message(self._identifier, self.get_status())
+				self.update_status()
+
 		elif event == Events.PRINT_STARTED:
 			GPIO.output(self.PIN_RPICAM, GPIO.HIGH)
 			GPIO.output(self.PIN_LED, GPIO.LOW)
-			self._plugin_manager.send_plugin_message(self._identifier, self.get_status())
+			self.update_status()
+
+		if event == Events.HOME:
+			if not self.printer_status():
+				self.power_printer(True)
+				self.update_status()
+
 		elif event == Events.PRINT_DONE:
 			self._printer.unselect_file()
 			if os.path.isfile(self.UNLOAD_FILE):
@@ -174,10 +203,22 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 			if os.path.isfile(self.POWEROFF_FILE):
 				if self._printer.is_operational():
 					self._printer.commands(["M104 S0", "M140 S0 W40"]) #see cooling plugin
- 
+
+	def M888_action_handler(self, comm, line, action, *args, **kwargs):
+		#self._logger.debug(action)
+		#self._logger.debug(self._printer.is_printing())
+		if action == "leveling" and self._printer.is_printing():
+				comm._log("Canceling print. Run bed leveling and try again.")
+				self._plugin_manager.send_plugin_message("mobile", dict(message = "Canceling print. Run bed leveling and try again."))
+				self._printer.cancel_print()
+
+
 __plugin_name__ = "Switches"
 
 def __plugin_load__():
 	global __plugin_implementation__
 	__plugin_implementation__ = SwitchPlugin()
+
+	global __plugin_hooks__
+	__plugin_hooks__ = {"octoprint.comm.protocol.action": __plugin_implementation__.M888_action_handler}
 
