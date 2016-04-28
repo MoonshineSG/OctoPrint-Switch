@@ -13,8 +13,7 @@ import os
 from flask import jsonify
 import RPi.GPIO as GPIO 
 from time import sleep
-
-#octoprint.plugin.TemplatePlugin,
+from thread import start_new_thread
 
 class SwitchPlugin(octoprint.plugin.AssetPlugin,
 					octoprint.plugin.SimpleApiPlugin,
@@ -88,6 +87,12 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		if os.path.isfile(file):
 			os.remove(file)
 			
+	def reconnect(self):
+		self._logger.info("Will reconnect in 30sec...")
+		sleep(30)		
+		self._printer.connect()
+		self._logger.info("== reconnected ==")
+		
 	def on_api_command(self, command, data):
 		self._logger.info("on_api_command called: '{command}' / '{data}'".format(**locals()))
 		if command == "mute":
@@ -100,9 +105,8 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 			self._printer.disconnect()			
 			GPIO.setup(self.PIN_RESET, GPIO.OUT, initial=0)
 			sleep(1)
-			GPIO.cleanup(self.PIN_RESET)
-			sleep(30)
-			self._printer.connect()
+			GPIO.cleanup(self.PIN_RESET)			
+			start_new_thread(self.reconnect, ())
 			
 		elif command == "poweroff":
 			if bool(data.get('status')):
