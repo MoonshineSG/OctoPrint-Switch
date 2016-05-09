@@ -42,14 +42,10 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		self.MUTE_FILE = os.path.join(self.get_plugin_data_folder(), "mute")
 		self.POWEROFF_FILE = os.path.join(self.get_plugin_data_folder(), "poweroff")
 		self.UNLOAD_FILE = os.path.join(self.get_plugin_data_folder(), "unload")
-		self.HOME_BUTTON_FILE = os.path.join(self.get_plugin_data_folder(), "home_button")
-
 		
 		self.touch(self.POWEROFF_FILE)
 		self.touch(self.UNLOAD_FILE)
 		
-		self.touch(self.HOME_BUTTON_FILE)
-
 		#the power is turned on by lights (and it should be turned off if nobody else needs it)
 		self.LIGHT = False 
 		
@@ -179,8 +175,6 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		if event == Events.POWER_ON:
 			self.LIGHT = False
 			if not self.printer_status():
-				self.remove(self.HOME_FILE)
-				self.remove(self.SKIP_HOME_FILE)
 				self.power_printer(True)
 				self.update_status()
 
