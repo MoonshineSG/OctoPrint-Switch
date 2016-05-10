@@ -197,10 +197,10 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 			self._printer.unselect_file()
 			if os.path.isfile(self.UNLOAD_FILE):
 				if self._printer.is_operational():
-					self._printer.commands(["G92 E0", "G1 E-12 F500", "G92 E0"])
+					self._printer.commands(["G92 E0", "G1 E-12 F600", "G92 E0"])
 			if os.path.isfile(self.POWEROFF_FILE):
 				if self._printer.is_operational():
-					self._printer.commands(["M104 S0", "M140 S0 W40"]) #see cooling plugin
+					self._printer.commands(["M104 S0", "M140 S0"])
 
 	def M888_action_handler(self, comm, line, action, *args, **kwargs):
 		#self._logger.debug(action)
