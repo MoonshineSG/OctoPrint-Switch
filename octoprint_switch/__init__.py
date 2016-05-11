@@ -206,9 +206,7 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		#self._logger.debug(action)
 		#self._logger.debug(self._printer.is_printing())
 		if action == "leveling" and self._printer.is_printing():
-				comm._log("Canceling print. Run bed leveling and try again.")
-				self._plugin_manager.send_plugin_message("mobile", dict(message = "Canceling print. Run bed leveling and try again."))
-				self._printer.cancel_print()
+				self._printer.commands("G29 P3 V4 T")
 
 
 __plugin_name__ = "Switches"
