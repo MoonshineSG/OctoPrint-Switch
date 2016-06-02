@@ -43,9 +43,6 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		self.POWEROFF_FILE = os.path.join(self.get_plugin_data_folder(), "poweroff")
 		self.UNLOAD_FILE = os.path.join(self.get_plugin_data_folder(), "unload")
 		
-		self.touch(self.POWEROFF_FILE)
-		self.touch(self.UNLOAD_FILE)
-		
 		#the power is turned on by lights (and it should be turned off if nobody else needs it)
 		self.LIGHT = False 
 		
@@ -107,7 +104,6 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		elif command == "poweroff":
 			if bool(data.get('status')):
 				self.touch(self.POWEROFF_FILE)
-				self.touch(self.UNLOAD_FILE)
 			else:
 				self.remove(self.POWEROFF_FILE)
 
@@ -164,7 +160,7 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 					if self._printer.is_operational():
 						if self._printer._comm:
 							self._printer._comm._log("Shuting down heaters, fans and motors...")
-						self._printer.commands(["M104 S0", "M140 S0", "M106 S0", "M18"])
+						self._printer.commands(["M104 T0 S0", "M104 T1 S0", "M140 S0", "M106 S0", "M18"])
 				except Exception as e:
 					self._logger.error(e)
 				if self._printer._comm:
@@ -191,22 +187,17 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		if event == Events.HOME:
 			if not self.printer_status():
 				self.power_printer(True)
+				self._printer.commands("M17")
 				self.update_status()
 
 		elif event == Events.PRINT_DONE:
 			self._printer.unselect_file()
-			if os.path.isfile(self.UNLOAD_FILE):
-				if self._printer.is_operational():
-					self._printer.commands(["G92 E0", "G1 E-12 F600", "G92 E0"])
 			if os.path.isfile(self.POWEROFF_FILE):
 				if self._printer.is_operational():
-					self._printer.commands(["M104 S0", "M140 S0"])
-
-	def M888_action_handler(self, comm, line, action, *args, **kwargs):
-		#self._logger.debug(action)
-		#self._logger.debug(self._printer.is_printing())
-		if action == "leveling" and self._printer.is_printing():
-				self._printer.commands("G29 P3 V4 T")
+					self._printer.commands(["M83", "T0", "G92 E0", "G1 E-15 F600", "G92 E0", "T1", "G92 E0", "G1 E-15 F600", "G92 E0", "T0",  "M104 T0 S0", "M104 T1 S0",  "M140 S0"])
+			if os.path.isfile(self.UNLOAD_FILE):
+				if self._printer.is_operational():
+					self._printer.commands(["M83", "G92 E0", "T0", "G1 E-700 F600", "G92 E0", "G92 E0", "T1", "G1 E-700 F600", "G92 E0", "T0" ])
 
 
 __plugin_name__ = "Switches"
@@ -214,7 +205,3 @@ __plugin_name__ = "Switches"
 def __plugin_load__():
 	global __plugin_implementation__
 	__plugin_implementation__ = SwitchPlugin()
-
-	global __plugin_hooks__
-	__plugin_hooks__ = {"octoprint.comm.protocol.action": __plugin_implementation__.M888_action_handler}
-
