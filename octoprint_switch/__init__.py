@@ -114,8 +114,12 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 				self.remove(self.UNLOAD_FILE)
 
 		elif command == "power":
-			self.power_printer(bool( data.get('status') ))
-			
+			if bool( data.get('status') ) :
+				self._printer.commands("M80")
+			else:
+				if not self._printer.is_printing():
+					self._printer.commands("M81")
+
 		elif command == "lights":
 			if bool( data.get('status') ):
 				if not self.printer_status():
@@ -148,36 +152,23 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 	def printer_status(self):
 		return bool(GPIO.input(self.PIN_POWER))
 
-	def power_printer(self, status):
-		if status:
-			self.LIGHT = False
-			if self._printer._comm:
-				self._printer._comm._log("Power up printer...")
-			GPIO.output(self.PIN_POWER, GPIO.HIGH)
-		else:
-			if not self._printer.is_printing():
-				try:
-					if self._printer.is_operational():
-						if self._printer._comm:
-							self._printer._comm._log("Shuting down heaters, fans and motors...")
-						self._printer.commands(["M104 T0 S0", "M104 T1 S0", "M140 S0", "M106 S0", "M18"])
-				except Exception as e:
-					self._logger.error(e)
-				if self._printer._comm:
-					self._printer._comm._log("Power down printer...")
-				GPIO.output(self.PIN_POWER, GPIO.LOW)
-
 	def on_event(self, event, payload):
 		if event == Events.POWER_ON:
 			self.LIGHT = False
 			if not self.printer_status():
-				self.power_printer(True)
+				self.LIGHT = False
+				if self._printer._comm:
+					self._printer._comm._log("Power on printer...")
+				GPIO.output(self.PIN_POWER, GPIO.HIGH)
 				self.update_status()
 
 		elif event == Events.POWER_OFF:
 			if self.printer_status():
-				self.power_printer(False)
-				self.update_status()
+				if not self._printer.is_printing():
+					if self._printer._comm:
+						self._printer._comm._log("Power off printer...")
+					GPIO.output(self.PIN_POWER, GPIO.LOW)
+					self.update_status()
 
 		elif event == Events.PRINT_STARTED:
 			GPIO.output(self.PIN_RPICAM, GPIO.HIGH)
@@ -186,18 +177,17 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 
 		if event == Events.HOME:
 			if not self.printer_status():
-				self.power_printer(True)
-				self._printer.commands("M17")
+				eventManager().fire(Events.POWER_ON)
 				self.update_status()
 
 		elif event == Events.PRINT_DONE:
 			self._printer.unselect_file()
-			if os.path.isfile(self.POWEROFF_FILE):
-				if self._printer.is_operational():
-					self._printer.commands(["M83", "T0", "G92 E0", "G1 E-15 F600", "G92 E0", "T1", "G92 E0", "G1 E-15 F600", "G92 E0", "T0",  "M104 T0 S0", "M104 T1 S0",  "M140 S0"])
 			if os.path.isfile(self.UNLOAD_FILE):
 				if self._printer.is_operational():
-					self._printer.commands(["M83", "G92 E0", "T0", "G1 E-700 F600", "G92 E0", "G92 E0", "T1", "G1 E-700 F600", "G92 E0", "T0" ])
+					self._printer.commands(["M83", "T0", "G92 E0", "G1 E-700 F3000", "G92 E0", "T1", "G92 E0", "G1 E-700 F3000", "G92 E0", "T0" ])
+			if os.path.isfile(self.POWEROFF_FILE):
+				if self._printer.is_operational():
+					self._printer.commands(["M83", "T0", "G92 E0", "G1 E-15 F600", "G92 E0", "T1", "G92 E0", "G1 E-15 F3000", "G92 E0", "T0", "M889 S1"])
 
 
 __plugin_name__ = "Switches"
