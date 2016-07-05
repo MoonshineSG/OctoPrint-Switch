@@ -75,10 +75,23 @@ $(function() {
 		}
 		
 		self.sendCommand = function(data) {
-			OctoPrint.postJson("api/plugin/switch", data)
-				.done(function() {
+			try {
+				OctoPrint.postJson(API_BASEURL + "plugin/switch", data)
+					.done(function() {
+						self.get_status();
+					});
+			} catch(err) { //fallback to pre-devel version
+				 $.ajax({
+					 url: API_BASEURL + "plugin/switch",
+					 type: "POST",
+					 dataType: "json",
+					 timeout: 10000,
+					 contentType: "application/json; charset=UTF-8",
+					 data: JSON.stringify(data)
+				}).done(function() {
 					self.get_status();
 				});
+			}
 		};
 		
 		self.toggleMute = function() {
@@ -111,7 +124,18 @@ $(function() {
 		}
 
 		self.get_status = function() {
-			OctoPrint.postJson("api/plugin/switch", {"command":"status"});
+			try {
+				OctoPrint.postJson(API_BASEURL + "plugin/switch", {"command":"status"});
+			} catch(err) { //fallback to pre-devel version
+				 $.ajax({
+					 url: API_BASEURL + "plugin/switch",
+					 type: "POST",
+					 dataType: "json",
+					 timeout: 10000,
+					 contentType: "application/json; charset=UTF-8",
+					 data: JSON.stringify({"command":"status"})
+				});
+			}
 		}
 		
 		self.onDataUpdaterPluginMessage = function (plugin, data) {
