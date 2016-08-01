@@ -27,12 +27,10 @@ Once the code file gets generated, Simplify3D executes the postprocessing sequen
 ```
 {REPLACE "; layer" "M808 zchange Layer"} 
 {REPLACE " Z = " " "}
-/full_path_to/toctoprint.py  trash select estimate --gcode "[output_filepath]"
+/full_path_to/toctoprint.py  trash select --gcode "[output_filepath]"
 ```
 
 See https://github.com/MoonshineSG/Simplify3D-to-OctoPrint
-
-Estimations provided by https://github.com/MoonshineSG/marlin-estimate. _Currently not very accurate._
 
 ## RaspberryPi - the brain 
 
