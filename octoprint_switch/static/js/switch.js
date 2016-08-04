@@ -69,6 +69,10 @@ $(function() {
 		self.onUserLoggedIn = function(user) {
 			self.get_status();
 		}
+
+		self.onAllBound = function(user) {
+			self.get_status();
+		}
 		
 		self.onDataUpdaterReconnect = function() {
 			self.get_status();
@@ -76,7 +80,7 @@ $(function() {
 		
 		self.sendCommand = function(data) {
 			try {
-				OctoPrint.postJson(API_BASEURL + "plugin/switch", data)
+				OctoPrint.postJson("api/plugin/switch", data)
 					.done(function() {
 						self.get_status();
 					});
@@ -125,7 +129,7 @@ $(function() {
 
 		self.get_status = function() {
 			try {
-				OctoPrint.postJson(API_BASEURL + "plugin/switch", {"command":"status"});
+				OctoPrint.postJson("api/plugin/switch", {"command":"status"});
 			} catch(err) { //fallback to pre-devel version
 				 $.ajax({
 					 url: API_BASEURL + "plugin/switch",
