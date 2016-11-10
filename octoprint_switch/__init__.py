@@ -210,8 +210,33 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 					self._logger.error("POWEROFF_FILE: printer is not operational ?")
 			#self._printer.unselect_file()
 
-__plugin_name__ = "Switches"
+	def get_version(self):
+		return self._plugin_version
+
+	def get_update_information(self):
+		return dict(
+			octoprint_switch=dict(
+				displayName="OctoPrint Switch",
+				displayVersion=self._plugin_version,
+
+				# version check: github repository
+				type="github_release",
+				user="MoonshineSG",
+				repo="OctoPrint-Switch",
+				current=self._plugin_version,
+
+				# update method: pip
+				pip="https://github.com/MoonshineSG/OctoPrint-Switch/archive/{target_version}.zip"
+			)
+		)
 
 def __plugin_load__():
 	global __plugin_implementation__
 	__plugin_implementation__ = SwitchPlugin()
+	
+	global __plugin_hooks__
+	__plugin_hooks__ = {
+		"octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
+	}
+	
+	
