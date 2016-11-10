@@ -10,6 +10,10 @@ Needs RPi.GPIO version greater than 0.6.0 to allow access to GPIO for non root a
 
 ![screenshot](screenshot_1.png)
 
+using Nautilus
+
+![screenshot](screenshot_1.png)
+
 #More....
 
 _This is part of a integrated solution to create a smooth 3D printing experience by "gluing" the individual software and hardware players_
