@@ -38,7 +38,7 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		GPIO.setup(self.PIN_POWER, GPIO.OUT)    #default OFF (normally open)
 
 		GPIO.setup(self.PIN_LED, GPIO.OUT)		#default OFF  (normally open)
-		#GPIO.setup(self.PIN_RPICAM, GPIO.OUT)	#default ON (internal)
+		GPIO.setup(self.PIN_RPICAM, GPIO.OUT)	#default ON (internal)
 				
 		self.MUTE_FILE = os.path.join(self.get_plugin_data_folder(), "mute")
 		self.POWEROFF_FILE = os.path.join(self.get_plugin_data_folder(), "poweroff")
