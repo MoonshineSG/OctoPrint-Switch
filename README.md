@@ -12,7 +12,7 @@ Needs RPi.GPIO version greater than 0.6.0 to allow access to GPIO for non root a
 
 using Nautilus
 
-![screenshot](screenshot_1.png)
+![screenshot](screenshot_2.png)
 
 #More....
 
