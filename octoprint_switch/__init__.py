@@ -23,7 +23,7 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 	PIN_RPICAM = 32	# red LED on RPi camera
 	PIN_POWER = 24	# Printer power switch
 	
-	PIN_RESET = 2 # Printer reset
+	PIN_RESET = 21 # Printer reset
 
 	def initialize(self):
 		#self._logger.setLevel(logging.DEBUG)
@@ -35,9 +35,10 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		GPIO.setmode(GPIO.BCM)
 		GPIO.setwarnings(False)
 
-		GPIO.setup(self.PIN_LED, GPIO.OUT)		#default ON  (normally closed)
-		GPIO.setup(self.PIN_RPICAM, GPIO.OUT)	#default ON (internal)
 		GPIO.setup(self.PIN_POWER, GPIO.OUT)    #default OFF (normally open)
+
+		GPIO.setup(self.PIN_LED, GPIO.OUT)		#default OFF  (normally open)
+		#GPIO.setup(self.PIN_RPICAM, GPIO.OUT)	#default ON (internal)
 				
 		self.MUTE_FILE = os.path.join(self.get_plugin_data_folder(), "mute")
 		self.POWEROFF_FILE = os.path.join(self.get_plugin_data_folder(), "poweroff")
@@ -69,7 +70,8 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 			unload=["status"],
 			poweroff=["status"],
 			status=[],
-			reset=[]
+			reset=[],
+			reload=[]
 		)
 
 	def touch(self, file):
@@ -100,6 +102,9 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 			sleep(1)
 			GPIO.cleanup(self.PIN_RESET)			
 			start_new_thread(self.reconnect, ())
+
+		elif command == "reload":
+			self._plugin_manager.send_plugin_message(self._identifier, dict( reload =  "now"))
 			
 		elif command == "poweroff":
 			if bool(data.get('status')):
@@ -126,14 +131,14 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 					GPIO.output(self.PIN_POWER, GPIO.HIGH)
 					self.LIGHT = True
 				GPIO.output(self.PIN_RPICAM, GPIO.HIGH)
-				GPIO.output(self.PIN_LED, GPIO.LOW)
+				GPIO.output(self.PIN_LED, GPIO.HIGH)
 			else:
 				if not self._printer.is_printing():
 					if self.LIGHT:
 						GPIO.output(self.PIN_POWER, GPIO.LOW)
 						self.LIGHT = False
 					GPIO.output(self.PIN_RPICAM, GPIO.LOW)
-					GPIO.output(self.PIN_LED, GPIO.HIGH)
+					GPIO.output(self.PIN_LED, GPIO.LOW)
 
 		elif command == "status":
 			self.update_status()
@@ -142,7 +147,7 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		mute_status  = str(os.path.isfile(self.MUTE_FILE)).lower()
 		unload_status  = str(os.path.isfile(self.UNLOAD_FILE)).lower()
 		poweroff_status  = str(os.path.isfile(self.POWEROFF_FILE)).lower()
-		light_status = "false" if GPIO.input(self.PIN_LED) else ("true" if GPIO.input(self.PIN_POWER) else "false")
+		light_status = ("true" if GPIO.input(self.PIN_POWER) else "false") if GPIO.input(self.PIN_LED) else "false" 
 		power_status = str(self.printer_status()).lower()
 		
 		payload =  dict( lights =  light_status, power = power_status,  mute = mute_status, unload = unload_status, poweroff = poweroff_status)
@@ -172,23 +177,38 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 
 		elif event == Events.PRINT_STARTED:
 			GPIO.output(self.PIN_RPICAM, GPIO.HIGH)
-			GPIO.output(self.PIN_LED, GPIO.LOW)
+			GPIO.output(self.PIN_LED, GPIO.HIGH)
 			self.update_status()
 
-		if event == Events.HOME:
+		elif event == Events.HOME:
 			if not self.printer_status():
 				eventManager().fire(Events.POWER_ON)
 				self.update_status()
+				
+		elif event == Events.FILAMENT_RUNOUT:
+				self._printer._comm._log("Filament runout!!")
 
 		elif event == Events.PRINT_DONE:
-			self._printer.unselect_file()
 			if os.path.isfile(self.UNLOAD_FILE):
+				self._logger.info("Unload fillament option is enabled. Running gcode sequence...")
+				self._printer._comm._log("Unload fillament option is enabled. Running gcode sequence...")
 				if self._printer.is_operational():
-					self._printer.commands(["M83", "T0", "G92 E0", "G1 E-700 F3000", "G92 E0", "T1", "G92 E0", "G1 E-700 F3000", "G92 E0", "T0" ])
+					self._printer.commands(["M83", "T0", "G92 E0", "T1", "G92 E0", "T0", "G1 E-5 F600", "T1", "G1 E-5 F600", "T0", "G1 E-5 F600", "T1", "G1 E-5 F600", "T0", "G1 E-5 F600", "T1", "G1 E-5 F600", "T0", "G1 E-750 F3000", "T1", "G1 E-750 F3000", "T0", "G92 E0", "T1", "G92 E0", "T0"])
+				else:
+					self._logger.error("UNLOAD_FILE: printer is not operational?")
 			if os.path.isfile(self.POWEROFF_FILE):
+				self._logger.info("Power Off option is enabled. Running gcode sequence...")
+				self._printer._comm._log("Power Off option is enabled.")
 				if self._printer.is_operational():
-					self._printer.commands(["M83", "T0", "G92 E0", "G1 E-15 F600", "G92 E0", "T1", "G92 E0", "G1 E-15 F3000", "G92 E0", "T0", "M889 S1"])
-
+					if os.path.isfile(self.UNLOAD_FILE):
+						self._logger.info("Unload fillament is enabled. Running simple gcode sequence...")
+						self._printer.commands(["M889 S1"])
+					else:
+						self._logger.info("Unload fillament is not enabled. Running long gcode sequence...")
+						self._printer.commands(["M83", "T0", "G92 E0", "T1", "G92 E0", "T0", "G1 E-5 F600", "T1", "G1 E-5 F600", "T0", "G1 E-5 F600", "T1", "G1 E-5 F600", "T0", "G1 E-5 F600", "T1", "G1 E-5 F600",  "T0", "G92 E0", "T1", "G92 E0", "M889 S1" , "T0"])
+				else:
+					self._logger.error("POWEROFF_FILE: printer is not operational ?")
+			#self._printer.unselect_file()
 
 __plugin_name__ = "Switches"
 
