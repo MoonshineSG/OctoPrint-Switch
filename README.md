@@ -18,7 +18,6 @@ plugins:
     power_pin: -1
     reset_pin: -1
     command_power_off: M81
-    extruders: 2
     retraction_length: 700
 	retraction_speed: 600
 	short_retraction_length: 10
@@ -29,7 +28,6 @@ plugins:
 - `power_pin` gpio where the printer power relay is connected
 - `reset_pin` gpio where the printer reset is connected (you can simulate a board switch push)
 - `command_power_off` gcode to turn off printer 
-- `extruders` number of extruders to unload filament from 
 - `retraction_length` usefull manly for bowden extruders
 - `retraction_speed` (self-explanatory)
 - `short_retraction_length` extration when only power off but not unload is selected
