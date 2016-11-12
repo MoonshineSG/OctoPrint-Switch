@@ -143,11 +143,14 @@ $(function() {
 		}
 		
 		self.onDataUpdaterPluginMessage = function (plugin, data) {
-					if (plugin != "switch") {
-						return;
+				if (plugin == "switch") {
+					if ( typeof(data.reload) !== "undefined") { 
+						window.location.reload(false);
+					} else {
+						self.updateIcons(data);
 					}
-					self.updateIcons(data);
-				} 
+				}
+			} 
 	}
 
 	OCTOPRINT_VIEWMODELS.push([
