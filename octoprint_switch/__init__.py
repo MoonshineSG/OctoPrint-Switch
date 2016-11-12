@@ -17,14 +17,12 @@ from thread import start_new_thread
 
 class SwitchPlugin(octoprint.plugin.AssetPlugin,
 					octoprint.plugin.SimpleApiPlugin,
-					octoprint.plugin.EventHandlerPlugin):
+					octoprint.plugin.EventHandlerPlugin,
+					octoprint.plugin.SettingsPlugin):
 	
-	PIN_LED = 23	# IR LED power switch
 	PIN_RPICAM = 32	# red LED on RPi camera
-	PIN_POWER = 24	# Printer power switch
+	EXTRUDERS = None
 	
-	PIN_RESET = 21 # Printer reset
-
 	def initialize(self):
 		#self._logger.setLevel(logging.DEBUG)
 		
@@ -35,9 +33,26 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		GPIO.setmode(GPIO.BCM)
 		GPIO.setwarnings(False)
 
-		GPIO.setup(self.PIN_POWER, GPIO.OUT)    #default OFF (normally open)
-
-		GPIO.setup(self.PIN_LED, GPIO.OUT)		#default OFF  (normally open)
+		self.PIN_LED = self._settings.get_int(["led_pin"])
+		self.PIN_POWER = self._settings.get_int(["power_pin"])
+		self.PIN_RESET = self._settings.get_int(["reset_pin"])
+		
+		self.POWER_OFF_COMMAND = self._settings.get(["command_power_off"]).split(",")
+		self.RETRACTION_LENGHT = self._settings.get_int(["retraction_length"])
+		self.SHORT_RETRACTION_LENGHT = self._settings.get_int(["short_retraction_length"])
+		self.RETRACTION_SPEED = self._settings.get_int(["retraction_speed"])
+		
+		
+		if self.PIN_POWER != -1:
+			GPIO.setup(self.PIN_POWER, GPIO.OUT)    #default OFF (normally open)
+		else:
+			self._logger.info("Power pin not setup.")
+			
+		if self.PIN_LED != -1:
+			GPIO.setup(self.PIN_LED, GPIO.OUT)		#default OFF  (normally open)
+		else:
+			self._logger.info("LED pin not setup.")
+				
 		GPIO.setup(self.PIN_RPICAM, GPIO.OUT)	#default ON (internal)
 				
 		self.MUTE_FILE = os.path.join(self.get_plugin_data_folder(), "mute")
@@ -49,6 +64,17 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		
 		self._logger.info("SwitchPlugin initialized...")
 
+
+	def get_settings_defaults(self):
+		return dict(
+			power_pin = -1,
+			led_pin = -1,
+			reset_pin = -1,
+			command_power_off = "M81",
+			retraction_speed = 600,
+			retraction_length = 600,
+			short_retraction_length = 10
+		)
 
 	def get_assets(self):
 		return dict(
@@ -97,11 +123,12 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 				self.remove(self.MUTE_FILE)
 
 		elif command == "reset":
-			self._printer.disconnect()			
-			GPIO.setup(self.PIN_RESET, GPIO.OUT, initial=0)
-			sleep(1)
-			GPIO.cleanup(self.PIN_RESET)			
-			start_new_thread(self.reconnect, ())
+			if self.PIN_RESET != -1:
+				self._printer.disconnect()
+				GPIO.setup(self.PIN_RESET, GPIO.OUT, initial=0)
+				sleep(1)
+				GPIO.cleanup(self.PIN_RESET)
+				start_new_thread(self.reconnect, ())
 
 		elif command == "reload":
 			self._plugin_manager.send_plugin_message(self._identifier, dict( reload =  "now"))
@@ -126,19 +153,20 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 					self._printer.commands("M81")
 
 		elif command == "lights":
-			if bool( data.get('status') ):
-				if not self.printer_status():
-					GPIO.output(self.PIN_POWER, GPIO.HIGH)
-					self.LIGHT = True
-				GPIO.output(self.PIN_RPICAM, GPIO.HIGH)
-				GPIO.output(self.PIN_LED, GPIO.HIGH)
-			else:
-				if not self._printer.is_printing():
-					if self.LIGHT:
-						GPIO.output(self.PIN_POWER, GPIO.LOW)
-						self.LIGHT = False
-					GPIO.output(self.PIN_RPICAM, GPIO.LOW)
-					GPIO.output(self.PIN_LED, GPIO.LOW)
+			if self.PIN_LED != -1 and self.PIN_POWER != -1:
+				if bool( data.get('status') ):
+					if not self.printer_status():
+						GPIO.output(self.PIN_POWER, GPIO.HIGH)
+						self.LIGHT = True
+					GPIO.output(self.PIN_RPICAM, GPIO.HIGH)
+					GPIO.output(self.PIN_LED, GPIO.HIGH)
+				else:
+					if not self._printer.is_printing():
+						if self.LIGHT:
+							GPIO.output(self.PIN_POWER, GPIO.LOW)
+							self.LIGHT = False
+						GPIO.output(self.PIN_RPICAM, GPIO.LOW)
+						GPIO.output(self.PIN_LED, GPIO.LOW)
 
 		elif command == "status":
 			self.update_status()
@@ -147,7 +175,10 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		mute_status  = str(os.path.isfile(self.MUTE_FILE)).lower()
 		unload_status  = str(os.path.isfile(self.UNLOAD_FILE)).lower()
 		poweroff_status  = str(os.path.isfile(self.POWEROFF_FILE)).lower()
-		light_status = ("true" if GPIO.input(self.PIN_POWER) else "false") if GPIO.input(self.PIN_LED) else "false" 
+		if self.PIN_LED != -1 and self.PIN_POWER != -1:
+			light_status = ("true" if GPIO.input(self.PIN_POWER) else "false") if GPIO.input(self.PIN_LED) else "false" 
+		else:
+			light_status = "false"
 		power_status = str(self.printer_status()).lower()
 		
 		payload =  dict( lights =  light_status, power = power_status,  mute = mute_status, unload = unload_status, poweroff = poweroff_status)
@@ -155,29 +186,35 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		self._plugin_manager.send_plugin_message(self._identifier, payload)
 
 	def printer_status(self):
-		return bool(GPIO.input(self.PIN_POWER))
+		if self.PIN_RESET != -1:
+			return bool(GPIO.input(self.PIN_POWER))
+		else:
+			return False;
 
 	def on_event(self, event, payload):
 		if event == Events.POWER_ON:
-			self.LIGHT = False
-			if not self.printer_status():
+			if self.PIN_POWER != -1:
 				self.LIGHT = False
-				if self._printer._comm:
-					self._printer._comm._log("Power on printer...")
-				GPIO.output(self.PIN_POWER, GPIO.HIGH)
-				self.update_status()
+				if not self.printer_status():
+					self.LIGHT = False
+					if self._printer._comm:
+						self._printer._comm._log("Power on printer...")
+					GPIO.output(self.PIN_POWER, GPIO.HIGH)
+					self.update_status()
 
 		elif event == Events.POWER_OFF:
-			if self.printer_status():
-				if not self._printer.is_printing():
-					if self._printer._comm:
-						self._printer._comm._log("Power off printer...")
-					GPIO.output(self.PIN_POWER, GPIO.LOW)
-					self.update_status()
+			if self.PIN_POWER != -1:
+				if self.printer_status():
+					if not self._printer.is_printing():
+						if self._printer._comm:
+							self._printer._comm._log("Power off printer...")
+						GPIO.output(self.PIN_POWER, GPIO.LOW)
+						self.update_status()
 
 		elif event == Events.PRINT_STARTED:
 			GPIO.output(self.PIN_RPICAM, GPIO.HIGH)
-			GPIO.output(self.PIN_LED, GPIO.HIGH)
+			if self.PIN_LED != -1:
+				GPIO.output(self.PIN_LED, GPIO.HIGH)
 			self.update_status()
 
 		elif event == Events.HOME:
@@ -190,40 +227,84 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 
 		elif event == Events.PRINT_DONE:
 			if os.path.isfile(self.UNLOAD_FILE):
-				self._logger.info("Unload fillament option is enabled. Running gcode sequence...")
-				self._printer._comm._log("Unload fillament option is enabled. Running gcode sequence...")
+				self._logger.info("Unload filament option is enabled. Running gcode sequence...")
 				if self._printer.is_operational():
-					self._printer.commands(["M83", "T0", "G92 E0", "T1", "G92 E0", "T0", "G1 E-5 F600", "T1", "G1 E-5 F600", "T0", "G1 E-5 F600", "T1", "G1 E-5 F600", "T0", "G1 E-5 F600", "T1", "G1 E-5 F600", "T0", "G1 E-750 F3000", "T1", "G1 E-750 F3000", "T0", "G92 E0", "T1", "G92 E0", "T0"])
+					self._printer._comm._log("Unload filament option is enabled. Running gcode sequence...")
+					self._printer.commands( self.generate_unload_filament(self.RETRACTION_LENGHT, self.RETRACTION_SPEED) )
 				else:
 					self._logger.error("UNLOAD_FILE: printer is not operational?")
 			if os.path.isfile(self.POWEROFF_FILE):
 				self._logger.info("Power Off option is enabled. Running gcode sequence...")
-				self._printer._comm._log("Power Off option is enabled.")
 				if self._printer.is_operational():
+					self._printer._comm._log("Power Off option is enabled.")
 					if os.path.isfile(self.UNLOAD_FILE):
-						self._logger.info("Unload fillament is enabled. Running simple gcode sequence...")
-						self._printer.commands(["M889 S1"])
+						self._logger.info("Unload filament is enabled. Running simple gcode sequence...")
+						self._printer.commands(self.POWER_OFF_COMMAND)
 					else:
-						self._logger.info("Unload fillament is not enabled. Running long gcode sequence...")
-						self._printer.commands(["M83", "T0", "G92 E0", "T1", "G92 E0", "T0", "G1 E-5 F600", "T1", "G1 E-5 F600", "T0", "G1 E-5 F600", "T1", "G1 E-5 F600", "T0", "G1 E-5 F600", "T1", "G1 E-5 F600",  "T0", "G92 E0", "T1", "G92 E0", "M889 S1" , "T0"])
+						self._logger.info("Unload filament is not enabled. Running long gcode sequence with small retraction...")
+						self._printer.commands( self.generate_unload_filament(self.SHORT_RETRACTION_LENGHT, self.RETRACTION_SPEED, self.POWER_OFF_COMMAND) )
 				else:
 					self._logger.error("POWEROFF_FILE: printer is not operational ?")
 			#self._printer.unselect_file()
 
+	def generate_unload_filament(self, length, speed, additional = None):
+		split = 10
+		if self.EXTRUDERS:
+			extruders = self.EXTRUDERS
+		else:
+			extruders = self._printer_profile_manager.get_current_or_default().get('extruder').get('count')
+		
+		ret = ["M83"] #make sure it's relative 
+
+		if extruders > 1:
+			for y in range(0, length/split): #every 10mm
+				for x in range(0, extruders):
+					ret.extend( ["T%s"%x, "G1 E-%s F%s"%(split, speed)] )
+
+			if length % split:
+				for x in range(0, extruders):
+					ret.extend( ["T%s"%x, "G1 E-%s F%s"%(length % split, speed)] )
+
+			for x in range(0, extruders):
+				ret.extend( ["T%s"%x, "M92 E0"] ) #set them back to 0
+		else:
+			ret.extend( ["T0", "G91" , "G1 E%s F%s"%(-length, speed), "G90"] )
+	
+		ret.append("T0")
+	
+		if additional:
+			ret.extend(additional)
+			
+		return ret
+
+	def custom_action_handler(self, comm, line, action, *args, **kwargs):
+		if action.startswith("active_extruders"):			
+			try:
+				act, self.EXTRUDERS = action.split(" ")
+				self.EXTRUDERS = int(self.EXTRUDERS)
+			except:
+				self.EXTRUDERS = None
+				
+			self._logger.info("Curent job uses %s extruders ..."%self.EXTRUDERS)
+
+
 	def get_version(self):
-		return self._plugin_version
+		if self._plugin_version:
+			return self._plugin_version
+		else:
+			return "99" #manualy installed
 
 	def get_update_information(self):
 		return dict(
 			octoprint_switch=dict(
 				displayName="OctoPrint Switch",
-				displayVersion=self._plugin_version,
+				displayVersion=self.get_version(),
 
 				# version check: github repository
 				type="github_release",
 				user="MoonshineSG",
 				repo="OctoPrint-Switch",
-				current=self._plugin_version,
+				current=self.get_version(),
 
 				# update method: pip
 				pip="https://github.com/MoonshineSG/OctoPrint-Switch/archive/{target_version}.zip"
@@ -236,7 +317,8 @@ def __plugin_load__():
 	
 	global __plugin_hooks__
 	__plugin_hooks__ = {
-		"octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information
+		"octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information,
+		"octoprint.comm.protocol.action": __plugin_implementation__.custom_action_handler
 	}
 	
 	
