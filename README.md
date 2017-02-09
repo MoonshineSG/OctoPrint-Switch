@@ -1,3 +1,5 @@
+##Not fully documented! Use carefully!! 
+
 Add switch buttons for:
 - switching printer on/off (confirm if currently printing)
 - switch  IR LED ligths on/off
