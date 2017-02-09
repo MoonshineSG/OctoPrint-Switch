@@ -14,6 +14,8 @@ from flask import jsonify
 import RPi.GPIO as GPIO 
 from time import sleep
 from thread import start_new_thread
+import threading
+import inspect
 
 class SwitchPlugin(octoprint.plugin.AssetPlugin,
 					octoprint.plugin.SimpleApiPlugin,
@@ -22,6 +24,12 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 	
 	PIN_RPICAM = 32	# red LED on RPi camera
 	EXTRUDERS = None
+	
+	autoOnCommands = "G0,G1,G2,G3,G10,G11,G28,G29,G32,M104,M109,M140,M190,M303".split(",")
+	idleIgnoreCommands = "M105,".split(",")
+	idleTimeout = 15
+	idleTimer = None
+	
 	
 	def initialize(self):
 		#self._logger.setLevel(logging.DEBUG)
@@ -71,7 +79,7 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 			led_pin = -1,
 			reset_pin = -1,
 			command_power_off = "M81",
-			retraction_speed = 600,
+			retraction_speed = 3000,
 			retraction_length = 600,
 			short_retraction_length = 10
 		)
@@ -113,9 +121,9 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		sleep(30)		
 		self._printer.connect()
 		self._logger.info("== reconnected ==")
-		
+				
 	def on_api_command(self, command, data):
-		self._logger.info("on_api_command called: '{command}' / '{data}'".format(**locals()))
+		self._logger.debug("on_api_command called: '{command}' / '{data}'".format(**locals()))
 		if command == "mute":
 			if bool(data.get('status')):
 				self.touch(self.MUTE_FILE)
@@ -147,10 +155,10 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 
 		elif command == "power":
 			if bool( data.get('status') ) :
-				self._printer.commands("M80")
+				eventManager().fire(Events.POWER_ON)
 			else:
 				if not self._printer.is_printing():
-					self._printer.commands("M81")
+					eventManager().fire(Events.POWER_OFF)
 
 		elif command == "lights":
 			if self.PIN_LED != -1 and self.PIN_POWER != -1:
@@ -186,7 +194,7 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		self._plugin_manager.send_plugin_message(self._identifier, payload)
 
 	def printer_status(self):
-		if self.PIN_RESET != -1:
+		if self.PIN_POWER != -1:
 			return bool(GPIO.input(self.PIN_POWER))
 		else:
 			return False;
@@ -201,22 +209,28 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 						self._printer._comm._log("Power on printer...")
 					GPIO.output(self.PIN_POWER, GPIO.HIGH)
 					self.update_status()
-
+					if not (self._printer.is_printing() or self._printer.is_paused()):
+						self.start_idle_timer()
+					
 		elif event == Events.POWER_OFF:
 			if self.PIN_POWER != -1:
 				if self.printer_status():
-					if not self._printer.is_printing():
+					if not self._printer.is_printing() or self._printer.is_paused():
 						if self._printer._comm:
 							self._printer._comm._log("Power off printer...")
 						GPIO.output(self.PIN_POWER, GPIO.LOW)
 						self.update_status()
+						self.stop_idle_timer()
 
 		elif event == Events.PRINT_STARTED:
 			GPIO.output(self.PIN_RPICAM, GPIO.HIGH)
 			if self.PIN_LED != -1:
 				GPIO.output(self.PIN_LED, GPIO.HIGH)
 			self.update_status()
-
+			self._logger.debug("Events.PRINT_STARTED calling stop")
+			self.stop_idle_timer()
+			
+			
 		elif event == Events.HOME:
 			if not self.printer_status():
 				eventManager().fire(Events.POWER_ON)
@@ -267,18 +281,18 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 
 			for x in range(0, extruders):
 				ret.extend( ["T%s"%x, "M92 E0"] ) #set them back to 0
+			
+			ret.append("T0")
 		else:
-			ret.extend( ["T0", "G91" , "G1 E%s F%s"%(-length, speed), "G90"] )
-	
-		ret.append("T0")
-	
+			ret.extend( [ "G91" , "G1 E%s F%s"%(-length, speed), "G90"] )
+
 		if additional:
 			ret.extend(additional)
 			
 		return ret
 
 	def custom_action_handler(self, comm, line, action, *args, **kwargs):
-		if action.startswith("active_extruders"):			
+		if action.startswith("active_extruders"):
 			try:
 				act, self.EXTRUDERS = action.split(" ")
 				self.EXTRUDERS = int(self.EXTRUDERS)
@@ -287,6 +301,35 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 				
 			self._logger.info("Curent job uses %s extruders ..."%self.EXTRUDERS)
 
+		
+	def hook_gcode_queuing(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
+		if gcode:
+			if gcode in self.autoOnCommands and not self.printer_status():
+					eventManager().fire(Events.POWER_ON)
+			
+			if not ( self._printer.is_printing() or self._printer.is_paused() ):
+				if self.printer_status() and gcode not in self.idleIgnoreCommands:
+					self.start_idle_timer() #restart the count
+		
+
+	def start_idle_timer(self):
+		self.stop_idle_timer()
+		
+		if self.printer_status():
+			self.idleTimer = threading.Timer(self.idleTimeout * 60, self.idle_poweroff)
+			self.idleTimer.start()
+
+	def stop_idle_timer(self):
+		if self.idleTimer:
+			self.idleTimer.cancel()
+			self.idleTimer = None
+
+	def idle_poweroff(self):
+		if self._printer.is_printing() or self._printer.is_paused():
+			return
+
+		self._logger.info("Idle timeout reached after %s minute(s). Shutting down printer." % self.idleTimeout)
+		eventManager().fire(Events.POWER_OFF)
 
 	def get_version(self):
 		if self._plugin_version:
@@ -318,7 +361,8 @@ def __plugin_load__():
 	global __plugin_hooks__
 	__plugin_hooks__ = {
 		"octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information,
-		"octoprint.comm.protocol.action": __plugin_implementation__.custom_action_handler
+		"octoprint.comm.protocol.action": __plugin_implementation__.custom_action_handler,
+		"octoprint.comm.protocol.gcode.queuing": __plugin_implementation__.hook_gcode_queuing
 	}
 	
 	
