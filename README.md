@@ -34,6 +34,8 @@ plugins:
 - `retraction_speed` (self-explanatory)
 - `short_retraction_length` extration when only power off but not unload is selected
 
+Update on 9 Feb 2017:
+	added "idleTimeout" (hardcoded for now !!!) 
 
 ![screenshot](screenshot_1.png)
 
