@@ -230,6 +230,9 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 			self._logger.debug("Events.PRINT_STARTED calling stop")
 			self.stop_idle_timer()
 			
+		elif event == Events.POWER_IDLE:
+			if not (self._printer.is_printing() or self._printer.is_paused()):
+				self.start_idle_timer()
 			
 		elif event == Events.HOME:
 			if not self.printer_status():
@@ -313,8 +316,9 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		
 
 	def start_idle_timer(self):
+		if self.idleTimer == None:
+			self._logger.info("Idle timer started...")
 		self.stop_idle_timer()
-		
 		if self.printer_status():
 			self.idleTimer = threading.Timer(self.idleTimeout * 60, self.idle_poweroff)
 			self.idleTimer.start()
@@ -329,6 +333,7 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 			return
 
 		self._logger.info("Idle timeout reached after %s minute(s). Shutting down printer." % self.idleTimeout)
+		self._printer._comm._log("Printer has been idle for %s minute(s)." % self.idleTimeout)
 		eventManager().fire(Events.POWER_OFF)
 
 	def get_version(self):
@@ -355,6 +360,9 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		)
 
 def __plugin_load__():
+	#patch Events with our own declaration
+	Events.POWER_IDLE = "PowerIdle"
+	
 	global __plugin_implementation__
 	__plugin_implementation__ = SwitchPlugin()
 	
