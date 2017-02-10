@@ -82,7 +82,7 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 			retraction_speed = 3000,
 			retraction_length = 600,
 			short_retraction_length = 10,
-			idle_timeout = 30
+			idle_timeout = 15
 		)
 
 	def get_assets(self):
@@ -215,7 +215,7 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		elif event == Events.POWER_OFF:
 			if self.PIN_POWER != -1:
 				if self.printer_status():
-					if not self._printer.is_printing() or self._printer.is_paused():
+					if not (self._printer.is_printing() or self._printer.is_paused()):
 						if self._printer._comm:
 							self._printer._comm._log("Power off printer...")
 						GPIO.output(self.PIN_POWER, GPIO.LOW)
@@ -228,6 +228,9 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 		elif event == Events.CONNECTED:
 			self.start_idle_timer()
 
+		elif event == Events.SHUTDOWN:
+			self.stop_idle_timer()
+			
 		elif event == Events.PRINT_STARTED:
 			GPIO.output(self.PIN_RPICAM, GPIO.HIGH)
 			if self.PIN_LED != -1:
@@ -321,7 +324,9 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 	def start_idle_timer(self):
 		if not (self._printer.is_printing() or self._printer.is_paused()) and self.printer_status():
 			if self.idleTimer == None:
-				self._logger.info("Idle timer started...")
+				self._logger.info("Idle timer started with timeout of %s minutes." % self.IDLE_TIMEOUT)
+			else:
+				self._logger.info("Idle timer reload...")
 			self.stop_idle_timer()
 			self.idleTimer = threading.Timer(self.IDLE_TIMEOUT * 60, self.idle_poweroff)
 			self.idleTimer.start()
