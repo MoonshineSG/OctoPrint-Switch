@@ -1,4 +1,3 @@
-##Not fully documented! Use carefully!! 
 
 Add switch buttons for:
 - switching printer on/off (confirm if currently printing)
@@ -23,6 +22,7 @@ plugins:
     retraction_length: 700
 	retraction_speed: 600
 	short_retraction_length: 10
+	idle_timeout: 15
 ```
 
 
@@ -33,9 +33,10 @@ plugins:
 - `retraction_length` usefull manly for bowden extruders
 - `retraction_speed` (self-explanatory)
 - `short_retraction_length` extration when only power off but not unload is selected
+- `idle_timeout` if no activity is detected for the specified number of minutes, the printer will pe shut down
 
 Update on 9 Feb 2017:
-	added "idleTimeout" (hardcoded for now !!!) 
+	added "idleTimeout" (see above)
 
 ![screenshot](screenshot_1.png)
 
