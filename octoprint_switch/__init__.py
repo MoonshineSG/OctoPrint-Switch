@@ -312,6 +312,13 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 				
 			self._logger.info("Curent job uses %s extruders ..."%self.EXTRUDERS)
 
+	def is_heating(self):
+		temps = self._printer.get_current_temperatures()
+		if isinstance(temps,dict):
+			for temp in temps.values():
+				if temp["target"] > 0:
+					return True 
+		return False
 		
 	def hook_gcode_queuing(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
 		if gcode:
@@ -320,13 +327,15 @@ class SwitchPlugin(octoprint.plugin.AssetPlugin,
 			
 			if self.printer_status() and gcode not in self.idleIgnoreCommands:
 					self.start_idle_timer()
+			
+	def hook_gcode_sent(self, comm_instance, phase, cmd, cmd_type, gcode, *args, **kwargs):
+			if self.is_heating():
+				self.stop_idle_timer()
 		
 	def start_idle_timer(self):
 		if not (self._printer.is_printing() or self._printer.is_paused()) and self.printer_status():
 			if self.idleTimer == None:
 				self._logger.info("Idle timer started with timeout of %s minutes." % self.IDLE_TIMEOUT)
-			else:
-				self._logger.info("Idle timer reload...")
 			self.stop_idle_timer()
 			self.idleTimer = threading.Timer(self.IDLE_TIMEOUT * 60, self.idle_poweroff)
 			self.idleTimer.start()
@@ -378,7 +387,8 @@ def __plugin_load__():
 	__plugin_hooks__ = {
 		"octoprint.plugin.softwareupdate.check_config": __plugin_implementation__.get_update_information,
 		"octoprint.comm.protocol.action": __plugin_implementation__.custom_action_handler,
-		"octoprint.comm.protocol.gcode.queuing": __plugin_implementation__.hook_gcode_queuing
+		"octoprint.comm.protocol.gcode.queuing": __plugin_implementation__.hook_gcode_queuing,
+		"octoprint.comm.protocol.gcode.sent": __plugin_implementation__.hook_gcode_sent
 	}
 	
 	
